@@ -13,33 +13,39 @@ const port = new SerialPort({
   baudRate: 9600
 })
 
-const currMatrixState: Array<number> = new Array(256).fill(0)
-const message = 0;
+var currMatrixState: Array<number> = new Array(256).fill(0)
+const pendingCommands: Array<PaintCommand> = []
+var isCommandProcessing = false
 
-LedClient.setStateListener( async (state)=>{
-  const mnum = message + 1;
-  console.log("received message " + mnum)
-  //need to reorder matrix to fit LED matrix ordering
-  const newMatrix: Array<Array<number>> = []
-  state.forEach((row, idx) => {
-    if (idx % 2 != 0) {
-      newMatrix.push(row.reverse())
-    } else {
-      newMatrix.push(row)
-    }
-  })
-  await sync([...currMatrixState], newMatrix.flat().reverse())
-  console.log("finished processing message " + mnum)
+LedClient.setStateListener((state)=>{
+  const newMatrixState = transformServerState(state)
+  const commands = diff(currMatrixState, newMatrixState)
+  pendingCommands.push(...commands)
+  currMatrixState = newMatrixState
 })
 
-//this might take several seconds. If we are syncing
-//while a new state comes in, we can ignore all states except the very latest one. 
-async function sync(matrixState: Array<number>, serverState: Array<number>) {
-  const commands = diff(matrixState, serverState)
-  for (const command of commands) {
-    await sendCommand(port, command)
+setInterval(async ()=>{
+  if (pendingCommands.length > 0 && !isCommandProcessing) {
+    isCommandProcessing = true
+    const command = pendingCommands.shift()
+    if (command != undefined) {
+      await sendCommand(port, command)
+      isCommandProcessing = false
+    }
   }
-  matrixState = serverState
+}, 100)
+
+function transformServerState(serverState: Array<Array<number>>): Array<number> {
+  //need to reorder matrix to fit LED matrix ordering
+  const matrix: Array<Array<number>> = []
+  serverState.forEach((row, idx) => {
+    if (idx % 2 != 0) {
+      matrix.push(row.reverse())
+    } else {
+      matrix.push(row)
+    }
+  })
+  return matrix.flat().reverse()
 }
 
 async function sendCommand(port: SerialPort, command: PaintCommand): Promise<void> {
