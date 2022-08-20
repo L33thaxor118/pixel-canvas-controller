@@ -1,5 +1,5 @@
 import { SerialPort } from 'serialport'
-import LedClient from 'azledclientnode'
+import LedClient from 'pixel-canvas-client-node'
 
 interface PaintCommand {
   pos: number,
@@ -7,18 +7,20 @@ interface PaintCommand {
   g: number,
   b: number
 }
+const NUM_PIXELS = 256
+const PAINT_SPEED = 100
 
 const port = new SerialPort({
   path: '/dev/tty.usbmodem11301',
   baudRate: 9600
 })
 
-var currMatrixState: Array<number> = new Array(256).fill(0)
+var currMatrixState: Array<number> = new Array(NUM_PIXELS).fill(0)
 const pendingCommands: Array<PaintCommand> = []
 var isCommandProcessing = false
 
 LedClient.setStateListener((state)=>{
-  const newMatrixState = transformServerState(state)
+  const newMatrixState = getTransformedServerState(state)
   const commands = diff(currMatrixState, newMatrixState)
   pendingCommands.push(...commands)
   currMatrixState = newMatrixState
@@ -33,14 +35,14 @@ setInterval(async ()=>{
       isCommandProcessing = false
     }
   }
-}, 100)
+}, PAINT_SPEED)
 
-function transformServerState(serverState: Array<Array<number>>): Array<number> {
+function getTransformedServerState(serverState: Array<Array<number>>): Array<number> {
   //need to reorder matrix to fit LED matrix ordering
   const matrix: Array<Array<number>> = []
   serverState.forEach((row, idx) => {
     if (idx % 2 != 0) {
-      matrix.push(row.reverse())
+      matrix.push(row.slice().reverse())
     } else {
       matrix.push(row)
     }
@@ -50,14 +52,19 @@ function transformServerState(serverState: Array<Array<number>>): Array<number> 
 
 async function sendCommand(port: SerialPort, command: PaintCommand): Promise<void> {
   return new Promise<void>((resolve, reject)=>{
-    port.write(`[${command.pos},${command.r},${command.g},${command.b}]`, (error)=> {
+    const commandToWrite = `[${command.pos},${command.r},${command.g},${command.b}]`
+    console.log(`writing command: ${commandToWrite}`)
+    port.write(commandToWrite, (error)=> {
       if (error) {
+        console.log("failed to write to serial port")
         reject()
       } else {
         port.on('data', (data)=>{
           if (data == 'd') {
+            console.log("command successful")
             resolve()
           } else {
+            console.log("command failed")
             reject()
           }
         })
@@ -68,18 +75,18 @@ async function sendCommand(port: SerialPort, command: PaintCommand): Promise<voi
 
 function diff(matrixState: Array<number>, serverState: Array<number>): Array<PaintCommand> {
   const commands = []
-  for (let i = 0; i < 256; i++) {
+  for (let i = 0; i < NUM_PIXELS; i++) {
     if (matrixState[i] != serverState[i]) {
-      const rgb = decimalToRgb(serverState[i])
+      const rgb = decimalColorToRgb(serverState[i])
       commands.push({pos: i, r: rgb.r, g: rgb.g, b: rgb.b})
     }
   }
   return commands
 }
 
-function decimalToRgb(color: number): {r: number, g: number, b: number} {
-  const r = Math.floor(color / (256*256));
-  const g = Math.floor(color / 256) % 256;
-  const b = color % 256;
+function decimalColorToRgb(color: number): {r: number, g: number, b: number} {
+  const r = Math.floor(color / (256*256))
+  const g = Math.floor(color / 256) % 256
+  const b = color % 256
   return {r:r, g:g, b:b}
 }

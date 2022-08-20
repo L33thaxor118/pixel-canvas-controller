@@ -1,14 +1,14 @@
 {
-  "name": "azledcontroller",
+  "name": "pixel-canvas-led-controller",
   "version": "1.0.0",
-  "description": "",
+  "description": "Program to control a pixel canvas rendered on a physical LED matrix",
   "main": "index.js",
   "scripts": {
     "prestart": "tsc",
     "start": "node lib/index.js",
     "build": "tsc"
   },
-  "author": "",
+  "author": "Azriel Alvarado",
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^17.0.35",
@@ -16,7 +16,7 @@
     "typescript": "^4.6.4"
   },
   "dependencies": {
-    "azledclientnode": "file:../client/node",
+    "pixel-canvas-client-node": "file:../../../../dev/projects/led/client/node",
     "serialport": "^10.4.0"
   }
 }
