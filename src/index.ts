@@ -8,7 +8,7 @@ interface PaintCommand {
   b: number
 }
 const NUM_PIXELS = 256
-const PAINT_SPEED = 100
+const PAINT_DELAY = 100
 const BAUD_RATE = 9600
 const SERIAL_PORT_PATH = '/dev/tty.usbmodem11301'
 const READY_MESSAGE = 'r'
@@ -46,7 +46,7 @@ setInterval(async () => {
       isCommandProcessing = false
     }
   }
-}, PAINT_SPEED)
+}, PAINT_DELAY)
 
 function getTransformedServerState(serverState: Array<Array<number>>): Array<number> {
   //need to reorder matrix to fit LED matrix ordering
