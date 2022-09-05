@@ -9,24 +9,27 @@ interface PaintCommand {
 }
 const NUM_PIXELS = 256
 const PAINT_SPEED = 100
+const BAUD_RATE = 9600
+const SERIAL_PORT_PATH = '/dev/tty.usbmodem11301'
+const LED_UPDATE_COMPLETE_MESSAGE = 'd'
 
 const port = new SerialPort({
-  path: '/dev/tty.usbmodem11301',
-  baudRate: 9600
+  path: SERIAL_PORT_PATH,
+  baudRate: BAUD_RATE
 })
 
 var currMatrixState: Array<number> = new Array(NUM_PIXELS).fill(0)
 const pendingCommands: Array<PaintCommand> = []
 var isCommandProcessing = false
 
-LedClient.setStateListener((state)=>{
+LedClient.setStateListener((state) => {
   const newMatrixState = getTransformedServerState(state)
   const commands = diff(currMatrixState, newMatrixState)
   pendingCommands.push(...commands)
   currMatrixState = newMatrixState
 })
 
-setInterval(async ()=>{
+setInterval(async () => {
   if (pendingCommands.length > 0 && !isCommandProcessing) {
     isCommandProcessing = true
     const command = pendingCommands.shift()
@@ -51,20 +54,16 @@ function getTransformedServerState(serverState: Array<Array<number>>): Array<num
 }
 
 async function sendCommand(port: SerialPort, command: PaintCommand): Promise<void> {
-  return new Promise<void>((resolve, reject)=>{
+  return new Promise<void>((resolve, reject) => {
     const commandToWrite = `[${command.pos},${command.r},${command.g},${command.b}]`
-    console.log(`writing command: ${commandToWrite}`)
-    port.write(commandToWrite, (error)=> {
+    port.write(commandToWrite, (error) => {
       if (error) {
-        console.log("failed to write to serial port")
         reject()
       } else {
-        port.on('data', (data)=>{
-          if (data == 'd') {
-            console.log("command successful")
+        port.once('data', (data) => {
+          if (data == LED_UPDATE_COMPLETE_MESSAGE) {
             resolve()
           } else {
-            console.log("command failed")
             reject()
           }
         })
