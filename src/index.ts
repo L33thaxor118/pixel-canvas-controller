@@ -11,11 +11,19 @@ const NUM_PIXELS = 256
 const PAINT_SPEED = 100
 const BAUD_RATE = 9600
 const SERIAL_PORT_PATH = '/dev/tty.usbmodem11301'
-const LED_UPDATE_COMPLETE_MESSAGE = 'd'
+const READY_MESSAGE = 'r'
+const PAINT_OPERATION_COMPLETE_MESSAGE = 'd'
 
 const port = new SerialPort({
   path: SERIAL_PORT_PATH,
   baudRate: BAUD_RATE
+})
+
+var canvasReady = false
+port.once('data', (data) => {
+  if (data == READY_MESSAGE) {
+    canvasReady = true
+  }
 })
 
 var currMatrixState: Array<number> = new Array(NUM_PIXELS).fill(0)
@@ -30,7 +38,7 @@ LedClient.setStateListener((state) => {
 })
 
 setInterval(async () => {
-  if (pendingCommands.length > 0 && !isCommandProcessing) {
+  if (canvasReady && pendingCommands.length > 0 && !isCommandProcessing) {
     isCommandProcessing = true
     const command = pendingCommands.shift()
     if (command != undefined) {
@@ -61,7 +69,7 @@ async function sendCommand(port: SerialPort, command: PaintCommand): Promise<voi
         reject()
       } else {
         port.once('data', (data) => {
-          if (data == LED_UPDATE_COMPLETE_MESSAGE) {
+          if (data == PAINT_OPERATION_COMPLETE_MESSAGE) {
             resolve()
           } else {
             reject()
